@@ -8,15 +8,25 @@ from overrides import override
 
 
 class PelicanVLFCHandler(OSSHandler):
-    def __init__(self, model_name, temperature) -> None:
-        super().__init__(model_name, temperature)
+    def __init__(
+        self,
+        model_name,
+        temperature,
+        registry_name,
+        is_fc_model,
+        dtype="bfloat16",
+        **kwargs,
+    ) -> None:
+        super().__init__(model_name, temperature, registry_name, is_fc_model, **kwargs)
+        # Pelican FC handler expects FC behavior
         self.is_fc_model = True
+        # Pelican models name on huggingface may be the base name without the "-FC" suffix
         self.model_name_huggingface = model_name.replace("-FC", "")
 
     @override
     def decode_ast(self, result, language, has_tool_call_tag):
         # Model response is of the form:
-        # "<tool_call>\n{\"name\": \"spotify.play\", \"arguments\": {\"artist\": \"Taylor Swift\", \"duration\": 20}}\n</tool_call>\n<tool_call>\n{\"name\": \"spotify.play\", \"arguments\": {\"artist\": \"Maroon 5\", \"duration\": 15}}\n</tool_call>"?
+        # "<tool_call>\n{\"name\": \"spotify.play\", \"arguments\": {\"artist\": \"Taylor Swift\", \"duration\": 20}}\n</tool_call>\n<tool_call>\n{\"name\": \"spotify.play\", \"arguments\": {\"artist\": \"Maroon 5\", \"duration\": 15}}\n</tool_call>"
         tool_calls = self._extract_tool_calls(result)
         if type(tool_calls) != list or any(type(item) != dict for item in tool_calls):
             raise ValueError(f"Model did not return a list of function calls: {result}")
@@ -38,10 +48,7 @@ class PelicanVLFCHandler(OSSHandler):
         return convert_to_function_call(decoded_result)
 
     @override
-    def _format_prompt(self,
-        messages, 
-        function
-        ):
+    def _format_prompt(self, messages, function):
         """
         "chat_template":
         {% set image_count = namespace(value=0) %}
